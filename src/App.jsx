@@ -8,9 +8,25 @@ import {
 } from './birthdayContent.js';
 
 const pad = (value) => String(value).padStart(2, '0');
-const localTime = () => {
+const publicAsset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
+const matchesCurrentTime = (value) => {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return false;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return false;
+
   const now = new Date();
-  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const minuteOfDay = hours * 60 + minutes;
+  const currentMinute = now.getHours() * 60 + now.getMinutes();
+  const current12HourMinute = (now.getHours() % 12 || 12) * 60 + now.getMinutes();
+  const isWithinOneMinute = (expectedMinute) => {
+    const difference = Math.abs(minuteOfDay - expectedMinute);
+    return Math.min(difference, 1440 - difference) <= 1;
+  };
+
+  return isWithinOneMinute(currentMinute) || isWithinOneMinute(current12HourMinute);
 };
 
 function Atmosphere({ count = 22, hearts = false }) {
@@ -227,6 +243,7 @@ function CakeCutting({ onNext }) {
       await audioRef.current.play();
       setMusicOn(true);
     } catch {
+      console.warn('Birthday music could not be resumed.');
       setMusicOn(false);
     }
   };
@@ -235,7 +252,7 @@ function CakeCutting({ onNext }) {
     <main className={`screen cutting-screen${cut ? ' cutting-screen--celebrate' : ''}`}>
       <Atmosphere count={25} hearts={cut} />
       {cut && <><Confetti burst /><Fireworks /></>}
-      {hasAudio && <audio ref={audioRef} src={AUDIO_FILE} loop preload="none" />}
+      {hasAudio && <audio ref={audioRef} src={publicAsset(AUDIO_FILE)} loop preload="none" onError={() => { console.warn('Birthday music file could not be loaded.'); setMusicOn(false); }} />}
       <div className="page-topline"><span>03 / 06</span><span>A MOMENT TO MAKE A WISH</span></div>
       <section className="cutting-content">
         <span className="eyebrow">THE SWEETEST PART</span>
@@ -279,17 +296,9 @@ function Secret({ onUnlock }) {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [unlocking, setUnlocking] = useState(false);
-  const [openedAt, setOpenedAt] = useState(localTime);
-
-  useEffect(() => {
-    const update = () => setOpenedAt(localTime());
-    const timer = window.setInterval(update, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
   const unlock = (event) => {
     event.preventDefault();
-    if (password.trim() !== openedAt) {
+    if (!matchesCurrentTime(password)) {
       setMessage('Almost... Try again ❤️');
       return;
     }
@@ -327,7 +336,7 @@ function Secret({ onUnlock }) {
           />
           <Button type="submit">Unlock <span>✧</span></Button>
         </form>
-        <p className={`secret-feedback${message ? ' secret-feedback--visible' : ''}`} aria-live="polite">{message || 'A little clue: use the time on your clock, in 24-hour format.'}</p>
+        <p className={`secret-feedback${message ? ' secret-feedback--visible' : ''}`} aria-live="polite">{message || 'A little clue: use your current local time in HH:MM format.'}</p>
         <span className="secret-decoration secret-decoration--left">✧</span>
         <span className="secret-decoration secret-decoration--right">✦</span>
       </section>
@@ -370,7 +379,7 @@ function Gallery({ onNext }) {
                 style={{ '--tilt': `${[-2, 1.5, -1, 2, -1.5, 1][index]}deg` }}
               >
                 <span className="memory-image">
-                  {imageAdded ? <img src={photo.src} alt={photo.note} /> : <span className="memory-placeholder"><i>✿</i><b>{String(index + 1).padStart(2, '0')}</b><small>your photo goes here</small></span>}
+                  {imageAdded ? <img src={publicAsset(photo.src)} alt={photo.note} /> : <span className="memory-placeholder"><i>✿</i><b>{String(index + 1).padStart(2, '0')}</b><small>your photo goes here</small></span>}
                   <span className="memory-zoom">↗</span>
                 </span>
                 <span className="memory-caption"><strong>{photo.label}</strong><small>{photo.note}</small></span>
@@ -385,7 +394,7 @@ function Gallery({ onNext }) {
           <button className="lightbox-close" aria-label="Close photo preview" onClick={() => setSelectedPhoto(null)}>×</button>
           <div className="lightbox-card" onClick={(event) => event.stopPropagation()}>
             {selectedPhoto.src && !selectedPhoto.src.startsWith('PLACEHOLDER_')
-              ? <img src={selectedPhoto.src} alt={selectedPhoto.note} />
+              ? <img src={publicAsset(selectedPhoto.src)} alt={selectedPhoto.note} />
               : <div className="lightbox-placeholder"><span>✿</span><strong>{selectedPhoto.label}</strong><small>Replace {selectedPhoto.src} in src/birthdayContent.js with a photo path.</small></div>}
             <p>{selectedPhoto.label} <span>·</span> {selectedPhoto.note}</p>
           </div>
